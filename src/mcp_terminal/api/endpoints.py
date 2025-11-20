@@ -6,8 +6,9 @@ Provides REST API for managing terminal sessions.
 
 import asyncio
 import logging
+from typing import Literal, Optional
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 
 from ..models import (
     TerminalCreate,
@@ -25,7 +26,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/terminals", tags=["terminals"])
 
 
-@router.post("/", response_model=TerminalResponse, status_code=201)
+@router.post(
+    "/",
+    response_model=TerminalResponse,
+    status_code=201,
+    operation_id="create_terminal",
+    summary="Create new terminal session",
+)
 async def create_terminal(
     request: TerminalCreate,
     manager: TerminalManagerDep,
@@ -57,7 +64,12 @@ async def create_terminal(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/", response_model=TerminalListResponse)
+@router.get(
+    "/",
+    response_model=TerminalListResponse,
+    operation_id="list_terminals",
+    summary="List all terminals",
+)
 async def list_terminals(manager: TerminalManagerDep):
     """
     List all active terminal sessions.
@@ -78,16 +90,44 @@ async def list_terminals(manager: TerminalManagerDep):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{terminal_id}/snapshot", response_model=TerminalSnapshot)
-async def get_terminal_snapshot(terminal_id: str, manager: TerminalManagerDep):
+@router.get(
+    "/{terminal_id}/snapshot",
+    response_model=TerminalSnapshot,
+    operation_id="get_terminal_snapshot",
+    summary="Get terminal visual snapshot",
+)
+async def get_terminal_snapshot(
+    terminal_id: str,
+    manager: TerminalManagerDep,
+    view_mode: Literal["full", "last_line", "last_n_lines", "cursor_area"] = Query(
+        default="full",
+        description="View mode: 'full' (entire screen), 'last_line' (only last line), 'last_n_lines' (last N lines), 'cursor_area' (lines around cursor)",
+    ),
+    n_lines: int = Query(
+        default=10,
+        ge=1,
+        le=200,
+        description="Number of lines for 'last_n_lines' mode",
+    ),
+    context_lines: int = Query(
+        default=3,
+        ge=1,
+        le=20,
+        description="Context lines before/after cursor for 'cursor_area' mode",
+    ),
+):
     """
     Get visual snapshot of terminal.
 
     Shows what a human would see on the terminal screen.
+    Supports different view modes to reduce context for LLMs.
 
     Args:
         terminal_id: Terminal session ID
         manager: Terminal manager dependency
+        view_mode: View mode to use (full, last_line, last_n_lines, cursor_area)
+        n_lines: Number of lines for last_n_lines mode
+        context_lines: Context lines for cursor_area mode
 
     Returns:
         Terminal snapshot with display, cursor, and metadata
@@ -95,7 +135,8 @@ async def get_terminal_snapshot(terminal_id: str, manager: TerminalManagerDep):
     try:
         # Add 5 second timeout
         snapshot = await asyncio.wait_for(
-            manager.get_snapshot(terminal_id), timeout=5.0
+            manager.get_snapshot(terminal_id, view_mode, n_lines, context_lines),
+            timeout=5.0,
         )
         return TerminalSnapshot(**snapshot)
     except asyncio.TimeoutError:
@@ -107,7 +148,12 @@ async def get_terminal_snapshot(terminal_id: str, manager: TerminalManagerDep):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{terminal_id}/input", response_model=TerminalResponse)
+@router.post(
+    "/{terminal_id}/input",
+    response_model=TerminalResponse,
+    operation_id="send_terminal_input",
+    summary="Send input to terminal",
+)
 async def send_terminal_input(
     terminal_id: str,
     request: TerminalInput,
@@ -117,6 +163,19 @@ async def send_terminal_input(
     Send input to terminal session.
 
     Use this to send commands, keystrokes, or any input to the terminal.
+
+    Special characters:
+    - Use \\n for newline (automatically converted to \\r\\n on Windows)
+    - Use \\x1b for ESC key (exit insert mode in vim, etc.)
+    - Use \\x03 for Ctrl+C (interrupt process)
+    - Use \\x04 for Ctrl+D (EOF/logout)
+    - Other control characters: \\x01-\\x1F
+
+    Examples:
+    - Send command: "echo hello\\n"
+    - Exit vim insert mode: "\\x1b"
+    - Vim command: "\\x1b:wq\\n"
+    - Interrupt process: "\\x03"
 
     Args:
         terminal_id: Terminal session ID
@@ -143,7 +202,12 @@ async def send_terminal_input(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/{terminal_id}/resize", response_model=TerminalResponse)
+@router.put(
+    "/{terminal_id}/resize",
+    response_model=TerminalResponse,
+    operation_id="resize_terminal",
+    summary="Resize terminal window",
+)
 async def resize_terminal(
     terminal_id: str,
     request: TerminalResize,
@@ -177,7 +241,12 @@ async def resize_terminal(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{terminal_id}", response_model=TerminalResponse)
+@router.delete(
+    "/{terminal_id}",
+    response_model=TerminalResponse,
+    operation_id="close_terminal",
+    summary="Close and cleanup terminal",
+)
 async def close_terminal(terminal_id: str, manager: TerminalManagerDep):
     """
     Close terminal session.
