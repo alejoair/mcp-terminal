@@ -3,8 +3,8 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcp-terminal"
-version = "0.1.0"
+name = "mcp-terminal-emulator"
+version = "0.2.0"
 description = "MCP server for interactive terminal sessions with cross-platform PTY support"
 readme = "README.md"
 requires-python = ">=3.10"
