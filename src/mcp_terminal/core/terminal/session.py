@@ -84,6 +84,63 @@ class TerminalSession:
             logger.error(f"Failed to start terminal {self.id}: {e}")
             raise
 
+    def _decode_escape_sequences(self, data: str) -> str:
+        """
+        Decode common escape sequences safely.
+
+        Handles common escape sequences like \\n, \\r, \\t, \\x##
+        without breaking on Windows paths (C:\\Users\\...).
+
+        Args:
+            data: Input string with escape sequences
+
+        Returns:
+            String with escape sequences decoded
+        """
+        import re
+
+        result = []
+        i = 0
+        while i < len(data):
+            if data[i] == '\\' and i + 1 < len(data):
+                next_char = data[i + 1]
+
+                # Handle common escape sequences
+                if next_char == 'n':
+                    result.append('\n')
+                    i += 2
+                elif next_char == 'r':
+                    result.append('\r')
+                    i += 2
+                elif next_char == 't':
+                    result.append('\t')
+                    i += 2
+                elif next_char == '\\':
+                    result.append('\\')
+                    i += 2
+                elif next_char == 'x' and i + 3 < len(data):
+                    # Handle \x## hexadecimal escape
+                    try:
+                        hex_str = data[i+2:i+4]
+                        char_code = int(hex_str, 16)
+                        result.append(chr(char_code))
+                        i += 4
+                    except ValueError:
+                        # Not a valid hex sequence, keep as-is
+                        result.append(data[i])
+                        i += 1
+                else:
+                    # Unknown escape or part of Windows path, keep backslash
+                    result.append(data[i])
+                    i += 1
+            else:
+                result.append(data[i])
+                i += 1
+
+        decoded = ''.join(result)
+        logger.info(f"Decoded escape sequences: {repr(data)} -> {repr(decoded)}")
+        return decoded
+
     async def write(self, data: str):
         """
         Write data to the terminal.
@@ -91,25 +148,26 @@ class TerminalSession:
         Args:
             data: String data to write (commands, keystrokes, etc.)
         """
+        logger.info(f"write() called with data: {repr(data)}")
+
         if not self.is_alive or not self.terminal:
             raise RuntimeError(f"Terminal {self.id} is not running")
 
         try:
             import asyncio
 
-            # Decode escape sequences (e.g., \x1b for ESC, \x03 for Ctrl+C)
-            # This allows sending control characters from the API
-            try:
-                data = data.encode().decode('unicode-escape')
-            except:
-                # If decoding fails, use original data
-                pass
+            # Decode escape sequences safely
+            # This handles common sequences like \n, \r, \t, \x##
+            # while preserving Windows paths like C:\Users\...
+            logger.info(f"About to decode escape sequences...")
+            data = self._decode_escape_sequences(data)
+            logger.info(f"After decode, data is: {repr(data)}")
 
-            # Convert line endings for Windows compatibility
-            # Windows cmd.exe expects \r\n (CRLF) for proper command execution
-            if os.name == "nt":  # Windows
-                # Replace \n with \r\n for proper command execution
-                data = data.replace("\n", "\r\n")
+            # No automatic line ending conversion
+            # Client (LLM) should send:
+            # - \r\n for Windows shell commands
+            # - \n for vim, editors, and multiline text
+            # This gives full control to the client and avoids conversion issues
 
             # Run blocking write in executor with 5 second timeout
             # terminado expects string, not bytes

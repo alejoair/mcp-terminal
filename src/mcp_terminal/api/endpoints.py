@@ -164,17 +164,24 @@ async def send_terminal_input(
 
     Use this to send commands, keystrokes, or any input to the terminal.
 
+    IMPORTANT: No automatic newline conversion is performed. You must send
+    the exact characters needed for your shell/application.
+
     Special characters:
-    - Use \\n for newline (automatically converted to \\r\\n on Windows)
+    - Use \\r\\n for Windows shell commands (cmd.exe, PowerShell)
+    - Use \\n for Unix shells and text editors (vim, nano, multiline text)
     - Use \\x1b for ESC key (exit insert mode in vim, etc.)
     - Use \\x03 for Ctrl+C (interrupt process)
     - Use \\x04 for Ctrl+D (EOF/logout)
     - Other control characters: \\x01-\\x1F
 
     Examples:
-    - Send command: "echo hello\\n"
+    - Windows cmd.exe: "dir\\r\\n"
+    - Windows PowerShell: "Get-ChildItem\\r\\n"
+    - Unix bash: "ls\\n"
+    - Vim multiline text: "line1\\nline2\\nline3"
     - Exit vim insert mode: "\\x1b"
-    - Vim command: "\\x1b:wq\\n"
+    - Vim save and quit: "\\x1b:wq\\n"
     - Interrupt process: "\\x03"
 
     Args:
