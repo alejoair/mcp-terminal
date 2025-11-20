@@ -97,6 +97,20 @@ class TerminalSession:
         try:
             import asyncio
 
+            # Decode escape sequences (e.g., \x1b for ESC, \x03 for Ctrl+C)
+            # This allows sending control characters from the API
+            try:
+                data = data.encode().decode('unicode-escape')
+            except:
+                # If decoding fails, use original data
+                pass
+
+            # Convert line endings for Windows compatibility
+            # Windows cmd.exe expects \r\n (CRLF) for proper command execution
+            if os.name == "nt":  # Windows
+                # Replace \n with \r\n for proper command execution
+                data = data.replace("\n", "\r\n")
+
             # Run blocking write in executor with 5 second timeout
             # terminado expects string, not bytes
             loop = asyncio.get_event_loop()

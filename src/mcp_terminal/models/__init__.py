@@ -10,6 +10,7 @@ from .terminal import (
     TerminalResponse,
     TerminalSize,
     TerminalSnapshot,
+    ViewRange,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "TerminalResponse",
     "TerminalSize",
     "TerminalSnapshot",
+    "ViewRange",
 ]

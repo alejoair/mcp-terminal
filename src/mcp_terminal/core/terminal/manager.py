@@ -171,36 +171,47 @@ class TerminalManager:
 
         await session.write(data)
 
-    async def get_snapshot(self, terminal_id: str) -> Dict:
+    async def get_snapshot(
+        self,
+        terminal_id: str,
+        view_mode: str = "full",
+        n_lines: int = 10,
+        context_lines: int = 3,
+    ) -> Dict:
         """
-        Get cached visual snapshot of terminal.
+        Get cached visual snapshot of terminal with optional view mode.
 
         Returns the most recent snapshot from the buffer (updated via WebSocket).
 
         Args:
             terminal_id: Terminal ID
+            view_mode: View mode - "full", "last_line", "last_n_lines", "cursor_area"
+            n_lines: Number of lines for "last_n_lines" mode
+            context_lines: Context lines for "cursor_area" mode
 
         Returns:
             Snapshot dict with display, cursor, etc.
         """
         session = self.sessions.get(terminal_id)
-        snapshot_buffer = self.snapshot_buffers.get(terminal_id)
+        buffer = self.buffers.get(terminal_id)
 
-        if not session or snapshot_buffer is None:
+        if not session or not buffer:
             raise ValueError(f"Terminal not found: {terminal_id}")
 
-        # Get most recent snapshot from buffer, or create empty if none
-        if snapshot_buffer:
-            snapshot = dict(snapshot_buffer[-1])  # Copy last snapshot
+        # Get snapshot with specified view mode
+        if view_mode != "full":
+            # Use buffer's view mode method for filtered views
+            snapshot = buffer.get_snapshot_with_mode(view_mode, n_lines, context_lines)
         else:
-            # No snapshots yet, return empty
-            snapshot = {
-                "display": "",
-                "lines": [],
-                "cursor": {"row": 0, "col": 0},
-                "size": {"rows": session.rows, "cols": session.cols},
-            }
+            # Use cached snapshot for full view
+            snapshot_buffer = self.snapshot_buffers.get(terminal_id)
+            if snapshot_buffer:
+                snapshot = dict(snapshot_buffer[-1])  # Copy last snapshot
+            else:
+                # No snapshots yet, get from buffer directly
+                snapshot = buffer.get_snapshot()
 
+        # Add metadata
         snapshot["terminal_id"] = terminal_id
         snapshot["is_alive"] = session.is_alive
         snapshot["created_at"] = session.created_at.isoformat()

@@ -34,6 +34,13 @@ class TerminalSize(BaseModel):
     cols: int = Field(description="Terminal width")
 
 
+class ViewRange(BaseModel):
+    """View range information."""
+
+    start_row: int = Field(description="Starting row of the view")
+    end_row: int = Field(description="Ending row of the view")
+
+
 class TerminalSnapshot(BaseModel):
     """Terminal visual snapshot."""
 
@@ -44,6 +51,12 @@ class TerminalSnapshot(BaseModel):
     size: TerminalSize = Field(description="Terminal size")
     is_alive: bool = Field(description="Whether terminal is running")
     created_at: str = Field(description="Terminal creation timestamp")
+    view_mode: Optional[str] = Field(
+        default="full", description="View mode used for this snapshot"
+    )
+    range: Optional[ViewRange] = Field(
+        default=None, description="Row range included in this view"
+    )
 
 
 class TerminalResponse(BaseModel):
