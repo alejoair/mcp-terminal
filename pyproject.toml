@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-terminal-emulator"
-version = "0.2.0"
+version = "0.2.1"
 description = "MCP server for interactive terminal sessions with cross-platform PTY support"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -52,7 +52,7 @@ Repository = "https://github.com/alejoair/mcp-terminal"
 Issues = "https://github.com/alejoair/mcp-terminal/issues"
 
 [project.scripts]
-mcp-terminal = "mcp_terminal.__main__:main"
+mcp-terminal-emulator = "mcp_terminal.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
